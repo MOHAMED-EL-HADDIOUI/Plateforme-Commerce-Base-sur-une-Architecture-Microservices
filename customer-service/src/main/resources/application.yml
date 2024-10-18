@@ -1,0 +1,82 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: CUSTOMER-SERVICE
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/microservice
+    username: root
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  config:
+    import: optional:configserver:http://localhost:8084
+
+  # configuration Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+
+management:
+  health:
+    circuitbreakers: # Cette configuration permet de surveiller et de rapporter l'état de santé (health) de votre application.
+      enabled: true
+  # Cette configuration détermine quand les points de terminaison HTTP (ou les routeurs) fournis par l'Actuator seront ouverts. La section exposure sous web définit les conditions sous lesquelles ces points de terminaison seront accessibles au monde extérieur (clients HTTP).
+  endpoints:
+    web:
+      exposure:
+        include: health  # Cela signifie que le point de terminaison /actuator/health répondra aux requêtes HTTP.
+  # Cette configuration détermine si des informations détaillées doivent être affichées dans les rapports fournis par le point de terminaison de santé (health) de votre application. En particulier, le paramètre show-details sous health contrôle le niveau de détails présentés par ce point de terminaison.
+  endpoint:
+    health:
+      show-details: always # : Détermine si des informations détaillées doivent être affichées dans les rapports fournis par le point de terminaison de santé.
+  tracing: # configuration de Zipkin
+    sampling:
+      probability: 1.0  # suit chaque requête
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      customerServiceBreaker: # Définit les configurations spécifiques pour une instance de Circuit Breaker nommée customerServiceBreaker.
+        registerHealthIndicator: true  # Permet l'enregistrement de l'état de santé du Circuit Breaker dans l'Actuator.
+        eventConsumerBufferSize: 10   # La valeur 10 spécifie la taille du tampon pour le consommateur d'événements. Cela détermine combien d'événements de Circuit Breaker sont conservés dans le tampon.
+        failureRateThreshold: 50      # Définit le seuil de taux d'échec. C'est le seuil de taux d'échec requis pour activer le Circuit Breaker (%50).
+        minimumNumberOfCalls: 5       # Définit le nombre minimal d'appels requis pour activer le Circuit Breaker.
+        automatic-transition-from-open-to-half-open-enabled: true # Indique si le Circuit Breaker doit automatiquement passer de l'état ouvert à l'état semi-ouvert.
+        waitDurationInOpenState: 6s              # Définit combien de temps le Circuit Breaker doit rester ouvert.
+        permittedNumberOfCallsInHalfOpenState: 3 # Définit le nombre d'appels autorisés en état semi-ouvert.
+        slidingWindowSize: 10                    # Définit la taille de la fenêtre glissante. Le Circuit Breaker utilise les appels dans cette fenêtre pour calculer le taux d'échec.
+        slidingWindowType: COUNT_BASED           # Définit le type de fenêtre glissante.
+
+  retry: # Mécanisme de réessai
+    instances:
+      customerServiceBreaker:
+        max-attempts: 3     # Indique combien de fois il doit être réessayé.
+        wait-duration: 5s   # Indique combien de temps attendre entre deux tentatives.
+
+  ratelimiter: # Utilise un limitateur de taux pour accepter un certain nombre de requêtes dans une période donnée
+    instances:
+      createCustomerLimiter:
+        limit-refresh-period: 4s    # Indique à quelle fréquence la limite sera renouvelée.
+        limit-for-period: 2         # Indique le nombre maximum d'appels autorisés par période.
+        timeout-duration: 0s        # Indique combien de temps attendre pour être accessible au limitateur de taux.
+
+  #eureka:
+  #  instance:
+  #    prefer-ip-address: true
+  #
+  #  client:
+  #    register-with-eureka: true
+  #    fetch-registry: true
+  #    service-url:
+  #      defaultZone: http://localhost:8761/eureka

@@ -1,0 +1,54 @@
+server:
+  port: 8083
+
+
+spring:
+  application:
+    name: API-GATEWAY
+  cloud:
+    gateway:
+      routes:
+        - id: PRODUCT-SERVICE
+          uri: lb://PRODUCT-SERVICE  # URI du service cible spécifiée. Les URI commençant par lb:// sont redirigées vers les microservices à l'aide d'un équilibrage de charge (load balancer).
+          predicates:  # Définit les règles de redirection. Par exemple, l'expression Path=/users/** redirige toutes les requêtes commençant par /api/v1/products/** vers cette route.
+            - Path=/api/v1/products/**
+
+        - id: ORDER-SERVICE
+          uri: lb://ORDER-SERVICE  # URI du service cible spécifiée. Les URI commençant par lb:// sont redirigées vers les microservices à l'aide d'un équilibrage de charge (load balancer).
+          predicates: # Définit les règles de redirection. Par exemple,
+            - Path=/api/v1/orders/**
+
+
+        - id: INVENTORY-SERVICE
+          uri: lb://INVENTORY-SERVICE  # URI du service cible spécifiée. Les URI commençant par lb:// sont redirigées vers les microservices à l'aide d'un équilibrage de charge (load balancer).
+          predicates: # Définit les règles de redirection.
+            - Path=/api/v1/inventories/**
+
+        - id: PAYMENT-SERVICE
+          uri: lb://PAYMENT-SERVICE  # URI du service cible spécifiée. Les URI commençant par lb:// sont redirigées vers les microservices à l'aide d'un équilibrage de charge (load balancer).
+          predicates: # Définit les règles de redirection.
+            - Path=/api/v1/payments/**
+
+        - id: CARGO-SERVICE
+          uri: lb://CARGO-SERVICE  # URI du service cible spécifiée. Les URI commençant par lb:// sont redirigées vers les microservices à l'aide d'un équilibrage de charge (load balancer).
+          predicates: # Définit les règles de redirection.
+            - Path=/api/v1/cargo/**
+
+
+  config:
+    import: optional:configserver:http://localhost:8084
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG # Définit le niveau de log pour le Gateway.
+
+
+#eureka:
+#  instance:
+#    prefer-ip-address: true
+#
+#  client:
+#    register-with-eureka: true
+#    fetch-registry: true
+#    service-url:
+#      defaultZone: http://localhost:8761/eureka

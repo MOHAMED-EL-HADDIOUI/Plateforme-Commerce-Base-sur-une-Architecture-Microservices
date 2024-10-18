@@ -1,0 +1,67 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: INVENTORY-SERVICE
+  datasource:
+    url: jdbc:mysql://localhost:3306/microservice
+    username: root
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # configuration Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+
+  rabbitmq:
+    host: localhost
+    username: guest
+    password: guest
+    port: 5672
+
+rabbit:
+  mq:
+    exchange:
+      name: e_commerce_exchange
+    routing:
+      key: e_commerce_routing_key
+    queue:
+      name: e_commerce_queue
+
+  config:
+    import: optional:configserver:http://localhost:8084
+
+management:
+  # Cette configuration détermine quand les points de terminaison HTTP (ou les routeurs) fournis par l'Actuator seront ouverts. En particulier, la section exposure sous web définit les conditions sous lesquelles ces points de terminaison seront accessibles au monde extérieur (clients HTTP).
+  endpoints:
+    web:
+      exposure:
+        include: health  # Cela signifie que le point de terminaison /actuator/health répondra aux requêtes HTTP.
+  # Cette configuration détermine si des informations détaillées doivent être affichées dans les rapports fournis par le point de terminaison de santé (health) de votre application. En particulier, le paramètre show-details sous health contrôle le niveau de détails présentés par ce point de terminaison.
+  endpoint:
+    health:
+      show-details: always # : Détermine si des informations détaillées doivent être affichées dans les rapports fournis par le point de terminaison de santé.
+  tracing: # Configuration de traçage Zipkin
+    sampling:
+      probability: 1.0  # Cela signifie que toutes les requêtes seront suivies.
+
+#eureka:
+#  instance:
+#    prefer-ip-address: true
+#
+#  client:
+#    register-with-eureka: true
+#    fetch-registry: true
+#    service-url:
+#      defaultZone: http://localhost:8761/eureka

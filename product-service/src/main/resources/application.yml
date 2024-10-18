@@ -1,0 +1,88 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: SERVICE-PRODUIT
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/microservice
+    username: root
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # configuration de Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+
+# configuration de swagger-ui
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html  # chemin par défaut.
+
+  config:
+    import: optional:configserver:http://localhost:8084
+
+management:
+  health:
+    circuitbreakers: # Cette configuration permet de surveiller et de rapporter l'état de santé (health) de votre application.
+      enabled: true
+  # Cette configuration indique dans quelles conditions les points de terminaison HTTP proposés par Actuator (ou les routeurs) doivent être exposés. En particulier, la section d'exposition sous web définit les conditions dans lesquelles ces points de terminaison seront accessibles depuis l'extérieur (clients HTTP).
+  endpoints:
+    web:
+      exposure:
+        include: health  # C'est-à-dire, le point de terminaison /actuator/health répondra aux requêtes HTTP.
+  # Cette configuration détermine si des informations détaillées doivent être affichées dans les rapports fournis par le point de terminaison de santé (health). En particulier, le paramètre show-details sous health contrôle le niveau de détail de ces informations.
+  endpoint:
+    health:
+      show-details: always # Indique si des informations détaillées doivent être affichées dans les rapports fournis par le point de terminaison de santé.
+  tracing: # configuration de zipkin
+    sampling:
+      probability: 1.0  # suivra chaque requête
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      inventoryServiceBreaker: # définit les configurations spécifiques pour un exemple de Circuit Breaker nommé inventoryServiceBreaker.
+        registerHealthIndicator: true  # permet l'enregistrement des informations d'état du Circuit Breaker dans Actuator.
+        eventConsumerBufferSize: 10   # indique la taille du tampon pour le consommateur d'événements, soit 10 événements du Circuit Breaker.
+        failureRateThreshold: 50      # définit le seuil de taux d'échec pour que le Circuit Breaker s'active (50%).
+        minimumNumberOfCalls: 5       # définit le nombre minimum d'appels requis pour activer le Circuit Breaker.
+        automatic-transition-from-open-to-half-open-enabled: true # détermine si le Circuit Breaker doit passer automatiquement de l'état ouvert à l'état semi-ouvert.
+        waitDurationInOpenState: 6s              # définit la durée pendant laquelle le Circuit Breaker doit rester ouvert.
+        permittedNumberOfCallsInHalfOpenState: 3 # définit le nombre d'appels autorisés en état semi-ouvert.
+        slidingWindowSize: 10                    # définit la taille de la fenêtre glissante utilisée pour calculer le taux d'échec.
+        slidingWindowType: COUNT_BASED           # définit le type de fenêtre glissante.
+
+  retry: # mécanisme de réessai
+    instances:
+      inventoryServiceBreaker:
+        max-attempts: 3     # indique le nombre de tentatives de réessai.
+        wait-duration: 5s   # indique la durée d'attente entre deux tentatives.
+
+  ratelimiter: # en utilisant un limiteur de taux pour accepter un nombre défini de requêtes dans un délai donné
+    instances:
+      createProductLimiter:
+        limit-refresh-period: 4s    # indique la fréquence à laquelle la limite est renouvelée.
+        limit-for-period: 2         # indique le nombre maximum d'appels autorisés par période.
+        timeout-duration: 0s        # indique combien de temps attendre pour accéder au limiteur de taux.
+
+  #eureka:
+#  instance:
+#    prefer-ip-address: true
+
+#  client:
+#    register-with-eureka: true
+#    fetch-registry: true
+#    service-url:
+#      defaultZone : http://localhost:8761/eureka

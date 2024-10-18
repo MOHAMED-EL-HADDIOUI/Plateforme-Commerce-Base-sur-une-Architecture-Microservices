@@ -1,0 +1,83 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: ORDER-SERVICE
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/microservice
+    username: root
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # configuration Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+
+  config:
+    import: optional:configserver:http://localhost:8084
+
+management:
+  health:
+    circuitbreakers: # Cette configuration configure la surveillance et le reporting de l'état de santé de votre application.
+      enabled: true
+  # Cette configuration détermine quand les points de terminaison HTTP (ou les routeurs) fournis par l'Actuator seront ouverts. En particulier, la section exposure sous web définit les conditions sous lesquelles ces points de terminaison seront accessibles au monde extérieur (clients HTTP).
+  endpoints:
+    web:
+      exposure:
+        include: health  # Cela signifie que le point de terminaison /actuator/health répondra aux requêtes HTTP.
+  # Cette configuration détermine si des informations détaillées doivent être affichées dans les rapports fournis par le point de terminaison de santé (health) de votre application. En particulier, le paramètre show-details sous health contrôle le niveau de détails présentés par ce point de terminaison.
+  endpoint:
+    health:
+      show-details: always # : Détermine si des informations détaillées doivent être affichées dans les rapports fournis par le point de terminaison de santé.
+  tracing: # Configuration Zipkin
+    sampling:
+      probability: 1.0  # Cela signifie que toutes les requêtes seront suivies.
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      orderServiceBreaker: # Définit des configurations spécifiques pour un exemple de Circuit Breaker nommé orderServiceBreaker.
+        registerHealthIndicator: true  # Permet d'enregistrer l'état de santé du Circuit Breaker dans l'Actuator.
+        eventConsumerBufferSize: 10   # La taille du tampon pour le consommateur d'événements. Cela détermine combien d'événements du Circuit Breaker seront maintenus dans le tampon.
+        failureRateThreshold: 50      # Définit le seuil de taux d'échec. C'est le seuil de taux d'échec requis pour activer le Circuit Breaker (%50).
+        minimumNumberOfCalls: 5       # Définit le nombre minimum d'appels requis pour activer le Circuit Breaker.
+        automatic-transition-from-open-to-half-open-enabled: true # Définit si le Circuit Breaker doit passer automatiquement de l'état ouvert à l'état semi-ouvert.
+        waitDurationInOpenState: 6s              # Définit combien de temps le Circuit Breaker doit rester ouvert.
+        permittedNumberOfCallsInHalfOpenState: 10 # Définit le nombre d'appels autorisés en état semi-ouvert.
+        slidingWindowSize: 10                    # Définit la taille de la fenêtre glissante. Le Circuit Breaker utilise ces appels pour calculer le taux d'échec.
+        slidingWindowType: COUNT_BASED           # Définit le type de fenêtre glissante.
+
+  retry: # Mécanisme de réessai
+    instances:
+      orderServiceBreaker:
+        max-attempts: 3     # Indique combien de fois le réessai sera effectué.
+        wait-duration: 5s   # Indique le temps d'attente entre deux essais.
+
+  ratelimiter: # Permet de limiter le nombre de requêtes acceptées dans une période donnée
+    instances:
+      createOrderLimiter:
+        limit-refresh-period: 4s    # Indique à quelle fréquence la limite doit être rafraîchie.
+        limit-for-period: 10         # Indique le nombre maximal d'appels autorisés pour chaque période.
+        timeout-duration: 0s        # Indique combien de temps attendre pour que le limiteur de taux soit accessible.
+
+  #eureka:
+  #  instance:
+  #    prefer-ip-address: true
+  #
+  #  client:
+  #    register-with-eureka: true
+  #    fetch-registry: true
+  #    service-url:
+  #      defaultZone : http://localhost:8761/eureka

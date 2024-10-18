@@ -1,0 +1,94 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: SERVICE_DE_PAIEMENT
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/service-de-paiement
+
+    # Configuration Redis
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+
+  rabbitmq:
+    host: localhost
+    username: guest
+    password: guest
+    port: 5672
+
+rabbit:
+  mq:
+    exchange:
+      name: e_commerce_exchange
+    routing:
+      key: e_commerce_routing_key
+    queue:
+      name: e_commerce_queue
+    cargo:
+      update:
+        queue:
+          name: e_commerce_cargo_update_queue
+        routing:
+          key: e_commerce_update_cargo_routing_key
+
+  config:
+    import: optional:configserver:http://localhost:8084
+
+management:
+  health:
+    circuitbreakers: # Cette configuration définit la surveillance et le reporting de l'état de santé de votre application.
+      enabled: true
+  # Cette configuration spécifie dans quelles conditions les points de terminaison HTTP fournis par Actuator seront exposés.
+  endpoints:
+    web:
+      exposure:
+        include: health  # Cela signifie que le point de terminaison /actuator/health répondra aux requêtes HTTP.
+  # Cette configuration indique si des détails supplémentaires seront affichés dans les rapports fournis par le point de terminaison de santé.
+  endpoint:
+    health:
+      show-details: always # Cela spécifie si des détails supplémentaires seront affichés dans les rapports de santé.
+  tracing: # Configuration de Zipkin
+    sampling:
+      probability: 1.0  # Cela signifie que toutes les requêtes seront suivies.
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentServiceBreaker: # Spécifie la configuration pour un exemple de Circuit Breaker nommé paymentServiceBreaker.
+        registerHealthIndicator: true  # Enregistre l'état de santé du Circuit Breaker dans Actuator.
+        eventConsumerBufferSize: 10   # Définit la taille du tampon pour le consommateur d'événements.
+        failureRateThreshold: 50      # Détermine le seuil de taux d'échec pour activer le Circuit Breaker.
+        minimumNumberOfCalls: 5       # Définit le nombre minimum d'appels requis pour activer le Circuit Breaker.
+        automatic-transition-from-open-to-half-open-enabled: true # Permet la transition automatique du Circuit Breaker d'ouvert à semi-ouvert.
+        waitDurationInOpenState: 6s              # Définit la durée pendant laquelle le Circuit Breaker reste ouvert.
+        permittedNumberOfCallsInHalfOpenState: 3 # Définit le nombre d'appels autorisés en état semi-ouvert.
+        slidingWindowSize: 10                    # Définit la taille de la fenêtre glissante pour le calcul du taux d'échec.
+        slidingWindowType: COUNT_BASED           # Définit le type de fenêtre glissante.
+
+  retry: # Mécanisme de réessai
+    instances:
+      inventoryServiceBreaker:
+        max-attempts: 3     # Définit combien de fois une opération peut être réessayée.
+        wait-duration: 5s   # Définit le temps d'attente entre deux tentatives.
+
+  ratelimiter: # Utilisation d'un limiteur de taux pour contrôler le nombre de requêtes acceptées sur une période donnée
+    instances:
+      createProductLimiter:
+        limit-refresh-period: 4s    # Définit la fréquence de renouvellement de la limite.
+        limit-for-period: 2         # Définit le nombre maximum d'appels autorisés par période.
+        timeout-duration: 0s        # Définit le temps d'attente avant de vérifier la disponibilité du limiteur de taux.
+
+  #eureka:
+  #  instance:
+  #    prefer-ip-address: true
+  #
+  #  client:
+  #    register-with-eureka: true
+  #    fetch-registry: true
+  #    service-url:
+  #      defaultZone: http://localhost:8761/eureka

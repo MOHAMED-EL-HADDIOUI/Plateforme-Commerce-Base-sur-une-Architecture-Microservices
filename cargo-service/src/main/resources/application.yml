@@ -1,0 +1,83 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: CARGO-SERVICE
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/microservice
+    username: root
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Configuration Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+
+  config:
+    import: optional:configserver:http://localhost:8084
+
+management:
+  health:
+    circuitbreakers: # Cette configuration permet de surveiller et de rapporter l'état de santé de votre application.
+      enabled: true
+  # Cette configuration indique quand les points de terminaison HTTP (ou routages) fournis par l'Actuator seront exposés. En particulier, la section exposure sous web définit dans quelles conditions ces points de terminaison seront accessibles au monde extérieur (aux clients HTTP).
+  endpoints:
+    web:
+      exposure:
+        include: health  # C'est-à-dire que le point de terminaison /actuator/health répondra aux requêtes HTTP.
+  # Cette configuration indique si des informations détaillées doivent être affichées dans les rapports fournis par le point de terminaison de santé. En particulier, le paramètre show-details sous health contrôle le niveau de détail fourni par ce point de terminaison.
+  endpoint:
+    health:
+      show-details: always # Indique si des informations détaillées doivent être affichées dans les rapports fournis par le point de terminaison de santé.
+  tracing: # Configuration de Zipkin
+    sampling:
+      probability: 1.0  # Suivre chaque requête
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      cargoServiceBreaker: # Définit les configurations spécifiques pour un exemple de Circuit Breaker nommé cargoServiceBreaker.
+        registerHealthIndicator: true  # Permet d'enregistrer l'état de santé du Circuit Breaker auprès de l'Actuator.
+        eventConsumerBufferSize: 10   # La valeur 10 spécifie la taille du tampon pour le consommateur d'événements. Cela détermine combien d'événements de Circuit Breaker seront conservés dans le tampon.
+        failureRateThreshold: 50      # Définit le seuil de taux d'échec. C'est le taux d'échec nécessaire pour activer le Circuit Breaker (%50).
+        minimumNumberOfCalls: 5       # Définit le nombre minimum d'appels nécessaires pour que le Circuit Breaker s'active.
+        automatic-transition-from-open-to-half-open-enabled: true # Indique si le Circuit Breaker doit passer automatiquement de l'état ouvert à l'état semi-ouvert.
+        waitDurationInOpenState: 6s              # Définit la durée pendant laquelle le Circuit Breaker restera dans l'état ouvert.
+        permittedNumberOfCallsInHalfOpenState: 3 # Définit le nombre d'appels autorisés dans l'état semi-ouvert.
+        slidingWindowSize: 10                    # Définit la taille de la fenêtre glissante. Le Circuit Breaker utilise les appels dans cette fenêtre pour calculer le taux d'échec.
+        slidingWindowType: COUNT_BASED           # Définit le type de fenêtre glissante.
+
+  retry: # Mécanisme de nouvelle tentative
+    instances:
+      cargoServiceBreaker:
+        max-attempts: 3     # Indique combien de fois il doit réessayer.
+        wait-duration: 5s   # Indique la durée d'attente entre deux tentatives.
+
+  ratelimiter: # Utiliser un limiteur de taux pour accepter un certain nombre de requêtes dans une période donnée
+    instances:
+      createCargoLimiter:
+        limit-refresh-period: 4s    # Indique à quelle fréquence la limite est rafraîchie.
+        limit-for-period: 2         # Indique le nombre maximal d'appels autorisés par période.
+        timeout-duration: 0s        # Indique combien de temps il doit attendre pour être accessible au limiteur de taux.
+
+  #eureka:
+#  instance:
+#    prefer-ip-address: true
+
+#  client:
+#    register-with-eureka: true
+#    fetch-registry: true
+#    service-url:
+#      defaultZone : http://localhost:8761/eureka
