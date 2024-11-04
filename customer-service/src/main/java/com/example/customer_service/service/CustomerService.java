@@ -106,7 +106,7 @@ public class CustomerService {
         log.info("CustomerService::deleteCustomerById customer : {}", customer);
 
 
-        customerRepository.deleteById(customer.getId());
+        customerRepository.deleteById(String.valueOf(customer.getId()));
         log.info("CustomerService::deleteCustomerById finished");
     }
 
@@ -144,5 +144,6 @@ public class CustomerService {
         log.info("fallback is executed because servise is down :{}", exception.getMessage());
         return CustomerResponseDto.builder().build();
     }
+
 
 }

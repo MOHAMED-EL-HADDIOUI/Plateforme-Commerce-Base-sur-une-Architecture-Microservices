@@ -31,7 +31,7 @@ public class Product implements Serializable {
     private String description;
 
     @Enumerated(EnumType.STRING)
-    private Category category = Category.SUPERMARCHÉ;
+    private Category category = Category.MODE;
 
     private double price;
 

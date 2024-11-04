@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
@@ -38,7 +39,7 @@ public class AddressMapper {
 
     public AddressResponseDto mapToAddressResponseDto(Address address) {
         return AddressResponseDto.builder()
-                .id(address.getId())
+                .id(String.valueOf(address.getId()))
                 .country(address.getCountry())
                 .city(address.getCity())
                 .district(address.getDistrict())

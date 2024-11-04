@@ -1,12 +1,11 @@
 package com.example.spring.boot.external;
-
 import com.example.spring.boot.model.Product;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
-@FeignClient(name = "PRODUCT-SERVICE")
+@FeignClient(name = "SERVICE-PRODUIT")
 public interface ProductClientService {
-    @PostMapping("/api/v1/products")
+    @PostMapping("/api/v1/products/add")
     Product addProduct(@RequestBody Product product);
 
     @GetMapping("/api/v1/products/{id}")

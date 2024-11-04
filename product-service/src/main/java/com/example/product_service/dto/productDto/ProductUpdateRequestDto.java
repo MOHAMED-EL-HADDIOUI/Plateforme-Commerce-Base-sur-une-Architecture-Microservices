@@ -40,6 +40,5 @@ public class ProductUpdateRequestDto implements Serializable {
     @Schema(description = "Price of the product", example = "299.99")
     private double price;
 
-
     private InventoryUpdateRequestDto inventoryUpdateRequestDto;
 }

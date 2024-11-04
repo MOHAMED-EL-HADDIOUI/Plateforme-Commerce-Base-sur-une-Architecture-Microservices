@@ -25,7 +25,7 @@ public class CustomerMapper {
 
     public CustomerResponseDto mapToCustomerResponseDto(Customer customer){
         return CustomerResponseDto.builder()
-                .id(customer.getId())
+                .id(String.valueOf(customer.getId()))
                 .firstName(customer.getFirstName())
                 .lastName(customer.getLastName())
                 .email(customer.getEmail())

@@ -77,7 +77,6 @@ public class OrderService {
     public OrderResponseDto createOrder(OrderRequestDto orderRequestDto) {
         log.info("Order::createOrder started");
 
-        // Feign Client ile senkron olarak Product ve Inventory servislerine çağrı yapıyoruz
         Product product = productClientService.getProductById(orderRequestDto.getProductId());
         Inventory inventory = inventoryClientService.getInventoryById(orderRequestDto.getInventoryId());
         Customer customer = customerClientService.getCustomerById(orderRequestDto.getCustomerId());
@@ -87,11 +86,9 @@ public class OrderService {
                 product.getId(), inventory.getId(), customer.getId());
 
 
-        // stok kontrolü yap.
-        // sipariş oluştur
         if (!(inventory.getStockQuantity() >= orderRequestDto.getQuantity())) {
             log.info("OrderResponseDto::createOrder - Order create with orderRequestDto.getQuantity : {}", orderRequestDto.getQuantity());
-            throw new InsufficientStockException("Yeterli stok mevcut değil !");
+            throw new InsufficientStockException("Not enough stock available!");
         }
 
         List<Address> addressList = customer.getAddressList();
@@ -103,7 +100,6 @@ public class OrderService {
         OrderResponseDto savedOrder = getSaveOrder(orderRequestDto, product, address);
         log.info("OrderResponseDto::createOrder - saved order: {}", savedOrder);
 
-        //sipariş oluşturulduğunda cargo-service ile iletişim sağlanıp kargo kaydı oluşturulacak.
 
         CargoRequestDto cargo = getCargo(savedOrder.getId(), customer.getId());
 
@@ -258,6 +254,4 @@ public class OrderService {
         log.error("Error update  order: ", t);
         return new OrderResponseDto(); // or any fallback response
     }
-
-
 }

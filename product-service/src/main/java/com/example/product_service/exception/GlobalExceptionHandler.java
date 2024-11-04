@@ -15,7 +15,6 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    //   // Validation hataları için handler
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<?> handleValidationExceptions(MethodArgumentNotValidException ex,WebRequest request) {
         Map<String, String> errors = new HashMap<>();
@@ -34,7 +33,6 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorDetails,  HttpStatus.BAD_REQUEST);
     }
 
-    // Özel bir hata için özel bir handler
     @ExceptionHandler(ProductNotFoundException.class)
     public ResponseEntity<?> handleProductNotFoundException(ProductNotFoundException ex, WebRequest request) {
         ErrorDetails errorDetails = ErrorDetails.builder()
@@ -47,7 +45,6 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorDetails, HttpStatus.NOT_FOUND);
     }
 
-    // Özel bir hata için özel bir handler
     @ExceptionHandler(InventoryNotFoundException.class)
     public ResponseEntity<?> handleInventoryNotFoundException(InventoryNotFoundException ex, WebRequest request) {
         ErrorDetails errorDetails = ErrorDetails.builder()
@@ -60,7 +57,6 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorDetails, HttpStatus.NOT_FOUND);
     }
 
-    // genel bir hata için handler
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGlobalException(Exception ex, WebRequest request) {
         ErrorDetails errorDetails = ErrorDetails.builder()

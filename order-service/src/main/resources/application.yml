@@ -6,7 +6,7 @@ spring:
     name: ORDER-SERVICE
 
   datasource:
-    url: jdbc:mysql://localhost:3306/microservice
+    url: jdbc:mysql://localhost:3306/microservice-order
     username: root
     password:
   jpa:

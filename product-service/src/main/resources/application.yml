@@ -6,7 +6,7 @@ spring:
     name: SERVICE-PRODUIT
 
   datasource:
-    url: jdbc:mysql://localhost:3306/microservice
+    url: jdbc:mysql://localhost:3306/microservice-product
     username: root
     password:
   jpa:
@@ -74,7 +74,7 @@ resilience4j:
     instances:
       createProductLimiter:
         limit-refresh-period: 4s    # indique la fréquence à laquelle la limite est renouvelée.
-        limit-for-period: 2         # indique le nombre maximum d'appels autorisés par période.
+        limit-for-period: 10         # indique le nombre maximum d'appels autorisés par période.
         timeout-duration: 0s        # indique combien de temps attendre pour accéder au limiteur de taux.
 
   #eureka:

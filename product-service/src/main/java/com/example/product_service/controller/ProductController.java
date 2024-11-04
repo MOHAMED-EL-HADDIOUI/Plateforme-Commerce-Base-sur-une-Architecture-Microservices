@@ -1,9 +1,16 @@
 package com.example.product_service.controller;
 
+import com.example.product_service.dto.inventoryDto.InventoryRequestDto;
+import com.example.product_service.dto.inventoryDto.InventoryUpdateRequestDto;
+import com.example.product_service.dto.productDto.ProductReqDto;
 import com.example.product_service.dto.productDto.ProductRequestDto;
 import com.example.product_service.dto.productDto.ProductResponseDto;
 import com.example.product_service.dto.productDto.ProductUpdateRequestDto;
+import com.example.product_service.enums.Category;
 import com.example.product_service.service.ProductService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import feign.Request;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -15,6 +22,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,26 +38,44 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
+    private final ObjectMapper objectMapper;
 
-    private int count = 1;
+    @Operation(summary = "Créer un nouveau produit", description = "Crée un nouveau produit avec les détails fournis")
+    @ApiResponse(responseCode = "200", description = "Successful operation")
+    @ApiResponse(responseCode = "400", description = "Données d'entrée invalides")
+    @ApiResponse(responseCode = "500", description = "Erreur serveur interne")
+    @PostMapping("/add")
+    public ResponseEntity<ProductResponseDto> createProduct(HttpEntity<String> httpEntity) {
+        try {
+            String jsonBody = httpEntity.getBody();
+            log.info("Received raw JSON: {}", jsonBody);
 
-    @PostMapping
-    @Operation(summary = "Create a new product", description = "Creates a new product with the provided details.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Product created successfully",
-                    content = @Content(schema = @Schema(implementation = ProductResponseDto.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid input data")
-    })
+            if (jsonBody == null) {
+                log.error("Request body is null");
+                return ResponseEntity.badRequest().build();
+            }
 
-    public ResponseEntity<ProductResponseDto> createProduct(@Valid @RequestBody ProductRequestDto productRequestDto) {
-        log.info("Retry Count : {}", count);
-        count++;
-        if (productRequestDto == null) {
-            throw new IllegalArgumentException("Request body cannot be null");
+            ProductReqDto productReqDto = objectMapper.readValue(jsonBody, ProductReqDto.class);
+            log.info("Parsed product request: {}", productReqDto);
+            ProductRequestDto productRequestDto = new ProductRequestDto();
+            InventoryRequestDto inventoryRequestDto = new InventoryRequestDto();
+
+            productRequestDto.setName(productReqDto.getName());
+            productRequestDto.setPrice(productReqDto.getPrice());
+            productRequestDto.setDescription(productReqDto.getDescription());
+            productRequestDto.setCategory(productReqDto.getCategory());
+            inventoryRequestDto.setStockQuantity(productReqDto.getQuantite());
+            productRequestDto.setInventoryRequestDto(inventoryRequestDto);
+
+            ProductResponseDto createdProduct = productService.createProduct(productRequestDto);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdProduct);
+        } catch (Exception e) {
+            log.error("Error processing product creation request", e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
-        ProductResponseDto createProduct = productService.createProduct(productRequestDto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createProduct);
     }
+
+
 
     @GetMapping("/all")
     @Operation(summary = "Get all products", description = "Retrieves a list of all products.")
@@ -59,6 +85,53 @@ public class ProductController {
     public ResponseEntity<List<ProductResponseDto>> getProductsAll() throws ServiceUnavailableException {
         List<ProductResponseDto> productsAll = productService.getProductsAll();
         return ResponseEntity.ok(productsAll);
+    }
+    @PutMapping
+    @Operation(summary = "Update product by ID", description = "Updates a product's details by its ID.")
+    public ResponseEntity<ProductResponseDto> updateProductById(HttpEntity<String> httpEntity) {
+        try {
+            String jsonBody = httpEntity.getBody();
+            log.info("Received raw JSON: {}", jsonBody);
+
+            if (jsonBody == null) {
+                log.error("Request body is null");
+                return ResponseEntity.badRequest().build();
+            }
+
+            ProductUpdateRequestDto productUpdateRequestDto = objectMapper.readValue(jsonBody, ProductUpdateRequestDto.class);
+            log.info("Parsed product request: {}", productUpdateRequestDto);
+
+            ProductResponseDto productById = productService.updateProductById(productUpdateRequestDto);
+            return ResponseEntity.status(HttpStatus.CREATED).body(productById);
+        } catch (Exception e) {
+            log.error("Error processing product update request", e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+    }
+
+
+    @GetMapping("/productByPriceRange")
+    @Operation(summary = "Get products by price range", description = "Retrieves products within a specified price range.")
+    @ApiResponse(responseCode = "200", description = "Successful operation",
+            content = @Content(schema = @Schema(implementation = ProductResponseDto.class)))
+    public ResponseEntity<List<ProductResponseDto>> getProductByPriceRange(
+            @Parameter(description = "Minimum price") @RequestParam("minPrice") double minPrice,
+            @Parameter(description = "Maximum price") @RequestParam("maxPrice") double maxPrice) {
+        List<ProductResponseDto> productNamesByPriceRange = productService.getProductByPriceRange(minPrice, maxPrice);
+        return ResponseEntity.ok(productNamesByPriceRange);
+    }
+
+
+
+    @GetMapping("/productByPriceGreaterThanEqual")
+    @Operation(summary = "Get products by price greater than or equal to", description = "Retrieves products with price greater than or equal to specified value.")
+    @ApiResponse(responseCode = "200", description = "Successful operation",
+            content = @Content(schema = @Schema(implementation = ProductResponseDto.class)))
+
+    public ResponseEntity<List<ProductResponseDto>> getProductByPriceGreaterThanEqual(@Parameter(description = "Price threshold")
+                                                                                      @RequestParam("price") double price) {
+        List<ProductResponseDto> productNamesByPriceGreaterThan = productService.getProductByPriceGreaterThanEqual(price);
+        return ResponseEntity.ok(productNamesByPriceGreaterThan);
     }
 
     @GetMapping("/{id}")
@@ -86,16 +159,7 @@ public class ProductController {
     }
 
 
-    @GetMapping("/productByPriceRange")
-    @Operation(summary = "Get products by price range", description = "Retrieves products within a specified price range.")
-    @ApiResponse(responseCode = "200", description = "Successful operation",
-            content = @Content(schema = @Schema(implementation = ProductResponseDto.class)))
-    public ResponseEntity<List<ProductResponseDto>> getProductByPriceRange(
-            @Parameter(description = "Minimum price") @RequestParam("minPrice") double minPrice,
-            @Parameter(description = "Maximum price") @RequestParam("maxPrice") double maxPrice) {
-        List<ProductResponseDto> productNamesByPriceRange = productService.getProductByPriceRange(minPrice, maxPrice);
-        return ResponseEntity.ok(productNamesByPriceRange);
-    }
+
 
 
     @GetMapping("/productByQuantity")
@@ -110,16 +174,7 @@ public class ProductController {
     }
 
 
-    @GetMapping("/productByPriceGreaterThanEqual")
-    @Operation(summary = "Get products by price greater than or equal to", description = "Retrieves products with price greater than or equal to specified value.")
-    @ApiResponse(responseCode = "200", description = "Successful operation",
-            content = @Content(schema = @Schema(implementation = ProductResponseDto.class)))
 
-    public ResponseEntity<List<ProductResponseDto>> getProductByPriceGreaterThanEqual(@Parameter(description = "Price threshold")
-                                                                                      @RequestParam("price") double price) {
-        List<ProductResponseDto> productNamesByPriceGreaterThan = productService.getProductByPriceGreaterThanEqual(price);
-        return ResponseEntity.ok(productNamesByPriceGreaterThan);
-    }
 
     @GetMapping("/productByPriceLessThanEqual")
     @Operation(summary = "Get products by price less than or equal to", description = "Retrieves products with price less than or equal to specified value.")
@@ -141,20 +196,6 @@ public class ProductController {
                                                                          @RequestParam("category") String category) {
         List<ProductResponseDto> productByCategory = productService.getProductByCategory(category);
         return ResponseEntity.ok(productByCategory);
-    }
-
-
-    @PutMapping
-    @Operation(summary = "Update product by ID", description = "Updates a product's details by its ID.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Product updated successfully",
-                    content = @Content(schema = @Schema(implementation = ProductResponseDto.class))),
-            @ApiResponse(responseCode = "404", description = "Product not found")
-    })
-    public ResponseEntity<ProductResponseDto> updateProductById(@RequestBody(description = "Product update details")
-                                                                ProductUpdateRequestDto productUpdateRequestDto) {
-        ProductResponseDto productById = productService.updateProductById(productUpdateRequestDto);
-        return ResponseEntity.ok(productById);
     }
 
     @DeleteMapping("/{id}")

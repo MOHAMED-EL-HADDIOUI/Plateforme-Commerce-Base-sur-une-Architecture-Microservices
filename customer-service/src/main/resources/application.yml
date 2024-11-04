@@ -6,7 +6,7 @@ spring:
     name: CUSTOMER-SERVICE
 
   datasource:
-    url: jdbc:mysql://localhost:3306/microservice
+    url: jdbc:mysql://localhost:3306/microservice-customer
     username: root
     password:
   jpa:

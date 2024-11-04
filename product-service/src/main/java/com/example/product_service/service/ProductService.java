@@ -8,6 +8,7 @@ import com.example.product_service.dto.productDto.ProductResponseDto;
 import com.example.product_service.dto.productDto.ProductUpdateRequestDto;
 import com.example.product_service.enums.Category;
 import com.example.product_service.exception.InventoryNotFoundException;
+import com.example.product_service.exception.ProductCreationException;
 import com.example.product_service.external.InventoryClientService;
 import com.example.product_service.mapper.ProductMapper;
 import com.example.product_service.model.Inventory;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,41 +51,60 @@ public class ProductService {
     @Retry(name = "inventoryServiceBreaker", fallbackMethod = "inventoryServiceFallback")
     @RateLimiter(name = "createProductLimiter", fallbackMethod = "inventoryServiceFallback")
     public ProductResponseDto createProduct(ProductRequestDto productRequestDto) {
-        log.info("ProductService::createProduct started");
+        log.info("Début de la création du produit");
 
-        Product product = productMapper.mapToProduct(productRequestDto);
-        log.info("ProductService::createProduct - Saving product: {}", productRequestDto);
-        Product saveProduct = productRepository.save(product);
+        try {
+            // Création du produit
 
+            Product product = new Product();
+            product.setName(productRequestDto.getName());
+            product.setDescription(productRequestDto.getDescription());
+            product.setPrice(productRequestDto.getPrice());
+            product.setCategory(productRequestDto.getCategory());
 
-        if (saveProduct.getId() == null) {
-            log.error("ProductService::createProduct - Product ID is null after saving.");
-            throw new IllegalStateException("Product ID should not be null after saving.");
+            Inventory inventory= new Inventory();
+            inventory.setStockQuantity(productRequestDto.getInventoryRequestDto().getStockQuantity());
+            product.setInventory(inventory);
+            Product savedProduct = productRepository.save(product);
+            validateSavedProduct(savedProduct);
+
+            // Création de l'inventaire
+            InventoryResponseDto inventoryResponse = createInventoryForProduct(savedProduct);
+
+            // Mise à jour du produit avec les informations d'inventaire
+            updateProductWithInventory(savedProduct, inventoryResponse);
+
+            log.info("Création du produit terminée avec succès");
+            return productMapper.mapToProductResponseDto(savedProduct);
+        } catch (Exception e) {
+            log.error("Erreur lors de la création du produit", e);
+            throw new ProductCreationException("Erreur lors de la création du produit", e);
         }
-
-        log.info("ProductService::createProduct - Creating inventory for product id: {} , product: {}",
-                saveProduct.getId(), saveProduct);
-
-        InventoryRequestDto inventoryRequestDto = productMapper.mapToInventoryRequestDto(saveProduct.getInventory());
-        inventoryRequestDto.setProductId(saveProduct.getId());
-
-        log.info("ProductService::createProduct - save inventoryRequestDto  : {}", inventoryRequestDto);
-        log.info("ProductService::createProduct - save inventoryRequestDto with product id : {}", inventoryRequestDto.getProductId());
-
-        // create inventory
-        InventoryResponseDto inventoryResponseDto = inventoryClientService.addInventory(inventoryRequestDto);
-        log.info("ProductService::createProduct - Updating inventory with inventory: {}", inventoryResponseDto.toString());
-
-        Inventory mapToInventory = productMapper.mapToInventory(inventoryResponseDto);
-        log.info("ProductService::createProduct - Updating inventory with inventory: {}", mapToInventory.toString());
-        saveProduct.setInventory(mapToInventory);
-        saveProduct.setInventoryId(inventoryResponseDto.getId());
-
-
-        log.info("ProductService::createProduct - Updating inventory with inventory: {}", mapToInventory);
-        log.info("ProductService::createProduct finished");
-        return productMapper.mapToProductResponseDto(saveProduct);
     }
+
+    private void validateSavedProduct(Product savedProduct) {
+        if (savedProduct.getId() == null) {
+            log.error("L'ID du produit est null après la sauvegarde");
+            throw new IllegalStateException("L'ID du produit ne devrait pas être null après la sauvegarde");
+        }
+    }
+
+    private InventoryResponseDto createInventoryForProduct(Product product) {
+        InventoryRequestDto inventoryRequestDto = productMapper.mapToInventoryRequestDto(product.getInventory());
+        inventoryRequestDto.setProductId(product.getId());
+        log.info("Création de l'inventaire pour le produit: {}", product.getId());
+        return inventoryClientService.addInventory(inventoryRequestDto);
+    }
+
+    private void updateProductWithInventory(Product product, InventoryResponseDto inventoryResponse) {
+        Inventory inventory = productMapper.mapToInventory(inventoryResponse);
+        product.setInventory(inventory);
+        product.setInventoryId(inventoryResponse.getId());
+        productRepository.save(product);
+    }
+
+
+
 
     // read
     @Cacheable(value = "products", key = "'all'")
@@ -93,9 +114,7 @@ public class ProductService {
         if (LocalDateTime.now().getHour() == 17) {
             throw new ServiceUnavailableException(ProductMessage.SERVICE_UNAVAILABLE_EXCEPTION);
         }
-
-        List<Product> productList = getProductsList();
-
+        List<Product> productList = productRepository.findAll();
         log.info("ProductService::getProductsAll finished");
         return productMapper.mapToProductResponseDtoList(productList);
     }
@@ -137,10 +156,8 @@ public class ProductService {
         Product updatedProduct = getUpdatedProduct(productUpdateRequestDto, product);
         log.info("ProductService::updateProductById - updatedProduct {}", updatedProduct);
 
-        // stok id kontrol et.
         inventoryClientService.getInventoryById(productUpdateRequestDto.getInventoryUpdateRequestDto().getInventoryId());
 
-        // inventory-service stok takibini güncelle.
         Inventory inventory = updatedProduct.getInventory();
         inventory.setProductId(productUpdateRequestDto.getInventoryUpdateRequestDto().getProductId());
         inventory.setStockQuantity(productUpdateRequestDto.getInventoryUpdateRequestDto().getNewQuantity());
@@ -181,56 +198,44 @@ public class ProductService {
     @Cacheable(value = "productsByPriceRange", key = "'range:' + #minPrice + '-' + #maxPrice")
     public List<ProductResponseDto> getProductByPriceRange(double minPrice, double maxPrice) {
         log.info("ProductService::getProductNamesByPriceRange started");
-
-        List<Product> productList = getProductsList();
+        Sort sort = Sort.by("price").ascending() ;
+//        Sort.by("price").descending();
+        List<Product> productList = productRepository.findByPriceBetween(minPrice,maxPrice,sort);
 
 
         log.info("ProductService::getProductNamesByPriceRange finished");
-        return productList.stream()
-                .filter(product -> product.getPrice() >= minPrice && product.getPrice() <= maxPrice)
-                .map(productMapper::mapToProductResponseDto)
-                .sorted(Collections.reverseOrder())
-                .collect(Collectors.toList());
+        return productMapper.mapToProductResponseDtoList(productList);
     }
 
 
     @Cacheable(value = "productsByPrice", key = "'greaterOrEqual:' + #price")
     public List<ProductResponseDto> getProductByPriceGreaterThanEqual(double price) {
         log.info("ProductService::getProductNamesByPriceGreaterThanEqual started");
-
-
-        List<Product> productList = getProductsList();
+        Sort sort = Sort.by("price").ascending() ;
+//        Sort.by("price").descending();
+        List<Product> productList = productRepository.findByPriceGreaterThanEqual(price,sort);
 
 
         log.info("ProductService::getProductNamesByPriceGreaterThanEqual finished");
-        return productList.stream()
-                .filter(product -> product.getPrice() >= price)
-                .map(productMapper::mapToProductResponseDto)
-                .sorted()
-                .collect(Collectors.toList());
+        return productMapper.mapToProductResponseDtoList(productList);
     }
 
 
     @Cacheable(value = "productsByPrice", key = "'lessOrEqual:' + #price")
     public List<ProductResponseDto> getProductByPriceLessThanEqual(double price) {
         log.info("ProductService::getProductNamesByPriceLessThanEqual started");
-
-        List<Product> productList = getProductsList();
-
-
+        Sort sort = Sort.by("price").ascending() ;
+//        Sort.by("price").descending();
+        List<Product> productList = productRepository.findByPriceLessThanEqual(price,sort);
         log.info("ProductService::getProductNamesByPriceLessThanEqual finished");
-        return productList.stream()
-                .filter(product -> product.getPrice() <= price)
-                .map(productMapper::mapToProductResponseDto)
-                .collect(Collectors.toList());
+        return productMapper.mapToProductResponseDtoList(productList);
+
     }
 
     @Cacheable(value = "productsByQuantity", key = "#quantity")
     public List<ProductResponseDto> getProductByQuantity(int quantity) {
         log.info("ProductService::getProductByQuantity started");
-        List<Product> productList = getProductsList();
-
-
+        List<Product> productList = productRepository.findAll();
         log.info("ProductService::getProductByQuantity finish");
         return productList.stream()
                 .filter(product -> product.getInventory().getStockQuantity() == quantity)
@@ -249,7 +254,6 @@ public class ProductService {
         }catch (IllegalArgumentException exception)
         {
             log.error("Product category type  provided: {}",category);
-            // Hata durumunda uygun bir işlem yapabilirsiniz, örneğin özel bir istisna fırlatma
             throw new IllegalArgumentException("Product category type: " + categoryTypeEnum);
         }
         List<Product> productList = productRepository.findByCategory(categoryTypeEnum);
@@ -260,9 +264,7 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
-    private List<Product> getProductsList() {
-        return productRepository.findAll();
-    }
+
 
 
     private Product getProduct(String productId) {
